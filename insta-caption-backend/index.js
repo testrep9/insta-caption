@@ -61,13 +61,14 @@ const extractInstagramData = async (url) => {
   }
 };
 
+// ✅ Final & clean GET /api/extract endpoint
 app.get("/api/extract", async (req, res) => {
   const postUrl = req.query.url;
-  const validPath = /instagram\.com\/(p|reel|tv)\/[a-zA-Z0-9_-]+/;
+  const validPath = /instagram\.com\/(p|reel|tv)\/[a-zA-Z0-9_-]+/i;
 
   if (!postUrl || !validPath.test(postUrl)) {
     return res.status(400).json({
-      error: "Invalid Instagram media URL. Must be a post, reel, or IGTV.",
+      error: "Invalid Instagram media URL. Must be a post, reel, or IGTV link.",
     });
   }
 
@@ -86,6 +87,7 @@ app.get("/api/extract", async (req, res) => {
   }
 });
 
+// ✅ Start server
 app.listen(PORT, () => {
   console.log("✅ Instagram Caption Extractor API is live!");
   console.log(`🌐 Listening on http://localhost:${PORT}`);
