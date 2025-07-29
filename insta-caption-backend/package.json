@@ -1,13 +1,14 @@
 {
   "name": "insta-caption-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend service to extract captions and images from public Instagram posts and Reels",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["instagram", "caption", "puppeteer", "scraper"],
+  "author": "Your Name",
   "license": "ISC",
   "dependencies": {
     "chrome-aws-lambda": "^10.1.0",
