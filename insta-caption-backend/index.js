@@ -1,5 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer"); // Or chrome-aws-lambda if deployed
+const chromium = require("chrome-aws-lambda");
 const cors = require("cors");
 
 const app = express();
@@ -8,22 +8,19 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-app.get("/api/extract", async (req, res) => {
-  const postUrl = req.query.url;
-
-  if (!postUrl || !postUrl.includes("instagram.com/")) {
-    return res.status(400).json({ error: "Invalid Instagram URL." });
-  }
-
+const extractInstagramData = async (url) => {
   let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    browser = await chromium.puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();
-    await page.goto(postUrl, { waitUntil: "networkidle2", timeout: 20000 });
+    await page.setDefaultNavigationTimeout(30000); // ⏱ Prevent long hangs
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
 
     const result = await page.evaluate(() => {
       let caption = null;
@@ -36,12 +33,10 @@ app.get("/api/extract", async (req, res) => {
           const metadata = JSON.parse(ldJson.innerText);
           caption = metadata.caption || metadata.articleBody || null;
           image = metadata.image || null;
-        } catch (e) {
-          // Fall through
-        }
+        } catch (e) {}
       }
 
-      // Fallback: Reels & posts
+      // Fallback for Reels and some Posts
       if (!caption) {
         const captionElem = document.querySelector("meta[property='og:description']");
         if (captionElem) {
@@ -59,19 +54,58 @@ app.get("/api/extract", async (req, res) => {
       return { caption, image };
     });
 
+    return result;
+  } catch (err) {
+    console.error("⚠️ Puppeteer error:", err.message);
+    throw new Error("Failed to extract Instagram content.");
+  } finally {
+    if (browser) await browser.close();
+  }
+};
+
+// GET endpoint
+app.get("/api/extract", async (req, res) => {
+  const postUrl = req.query.url;
+
+  if (!postUrl || !postUrl.includes("instagram.com/")) {
+    return res.status(400).json({ error: "Invalid Instagram URL." });
+  }
+
+  try {
+    const result = await extractInstagramData(postUrl);
+
     if (!result.caption && !result.image) {
       return res.status(500).json({ error: "Could not extract content from post or reel." });
     }
 
     res.json(result);
   } catch (err) {
-    console.error("Error extracting:", err.message);
-    res.status(500).json({ error: "Puppeteer failed to extract Instagram content." });
-  } finally {
-    if (browser) await browser.close();
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Optional: POST endpoint (alternative to GET)
+app.post("/api/extract", async (req, res) => {
+  const postUrl = req.body.url;
+
+  if (!postUrl || !postUrl.includes("instagram.com/")) {
+    return res.status(400).json({ error: "Invalid Instagram URL." });
+  }
+
+  try {
+    const result = await extractInstagramData(postUrl);
+
+    if (!result.caption && !result.image) {
+      return res.status(500).json({ error: "Could not extract content from post or reel." });
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log("✅ Instagram Caption Extractor API is live!");
+  console.log(`🌐 Listening on http://localhost:${PORT}`);
 });
